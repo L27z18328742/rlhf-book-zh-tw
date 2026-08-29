@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>第 7 章　推理与推论时扩展 — RLHF 中文版</title>
+<link rel="stylesheet" href="../assets/katex/katex.min.css">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="../index.html">RLHF 中文版<span>从人类反馈中强化学习</span></a>
+  <nav class="chapnav"><a href="ch06.html">← 第 6 章</a><span class="chapnav-current">第 7 章　推理与推论时扩展</span><a href="ch08.html">第 8 章 →</a><a class="gh-star" href="https://github.com/ai-twinkle/rlhf-book-zh-tw" target="_blank" rel="noopener" data-gh-repo="ai-twinkle/rlhf-book-zh-tw"><span class="star-ico">★</span><span class="gh-label">Star</span><b class="gh-count" hidden></b></a></nav>
+</header>
+<div class="layout">
+  <aside class="sidebar"><nav id="toc" class="toc"><h2>本章目录</h2></nav></aside>
+  <main class="main">
+    <div id="lab-banner"></div>
+    <article id="content" class="prose"></article>
+    <section id="lab" class="lab" hidden>
+      <h2 class="lab-title">🧪 互动实验室</h2>
+      <div id="lab-intro"></div>
+      <div id="lab-root"></div>
+    </section>
+    <nav class="pager"><a class="prev" href="ch06.html"><span class="dir">← 上一章</span><div class="ttl">第 6 章　强化学习</div></a><a class="next" href="ch08.html"><span class="dir">下一章 →</span><div class="ttl">第 8 章　直接对齐算法</div></a></nav>
+    <footer class="pagefoot">本站为 <a href="https://github.com/ai-twinkle">Twinkle AI Community</a>（台湾）的<strong>非官方社群翻译</strong>（unofficial community translation）· 译自 Nathan Lambert,《Reinforcement Learning from Human Feedback》（<a href="https://rlhfbook.com">rlhfbook.com</a>）· 依 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh-hans">CC BY-NC-SA 4.0</a> 授权，仅供学习研究、不得作商业用途。</footer>
+  </main>
+</div>
+<script type="text/markdown" id="chapter-md">
+# 第 7 章　推理与推论时扩展（Reasoning and Inference-Time Scaling）
+
+> 译自 Nathan Lambert, *Reinforcement Learning from Human Feedback*（rlhfbook.com），2026-07-01 版，原文第 94–104 页。
+
+推理模型（reasoning models）与推论时扩展（inference-time scaling）让语言模型的性能在 2024 年底、贯穿 2025 年、乃至未来，都实现了巨大的跃进。推论时扩展指的是在生成过程中使用更多运算来提升模型性能的能力，例如产生更长的推理链（reasoning chains）或采样多个回应。被训练成在回答前进行大量思考的语言模型，能极为出色地利用这项特性。这些模型以大量的可验证奖励强化学习（Reinforcement Learning with Verifiable Rewards, RLVR）[6] 训练而成，但仍然使用大量的 RLHF。在本章中，我们回顾引领 AI 社群彻底改观、重新认识 RL 在语言模型中潜力的历程，回顾 RLVR 的基本原理，重点介绍关键研究，并指出将在未来几年定义这个领域的争论。
+
+## 7.1 RLVR 的角色（The Role of RLVR）
+
+首先，在 2016 年的神经信息处理系统（Neural Information Processing Systems, NeurIPS）会议上，Yann LeCun 首次提出他如今广为人知的蛋糕比喻，用来说明现代机器学习系统中学习发生的位置：
+
+> 如果智能是一块蛋糕，蛋糕的主体是非监督式学习（unsupervised learning），蛋糕上的糖霜是监督式学习（supervised learning），而蛋糕上的樱桃则是强化学习（RL）。
+
+随着现代语言模型与后训练（post-training）技术堆栈近期的变化，这个类比如今大致上已然成真。RLHF 是它的前奏，而主要应用于数学、代码与科学主题的推理模型 RL，则是它的印证。在这个类比中：
+
+- 在海量互联网数据上进行的自监督式学习（self-supervised learning）构成了蛋糕的绝大部分（尤其是以 FLOPs 计算的计算量来看）；
+- 后训练的开端——针对指令的监督式微调（supervised fine-tuning, SFT）——将模型调校到一个较窄的分布；以及
+- 最后，「纯粹的」强化学习（RL）是顶端的那颗樱桃。用来打造新一代「推理（reasoning）」或「思考（thinking）」模型的大规模强化学习，就是这块收尾的拼图（同时也借助了 RLHF 的帮助——RLHF 并不被视为古典 RL，我们稍后会说明）。
+
+这一小部分的推理训练随着**思考模型（thinking models）**的出现而兴起。这类模型结合了本书所讨论的各种后训练技术来对齐偏好，并在可验证领域（verifiable domains）上进行 RL 训练，从而大幅提升推理、程序撰写与数学解题等能力。
+
+这些模型的训练方法——可验证奖励强化学习（Reinforcement Learning with Verifiable Rewards, RLVR）[6]——的流程与 RLHF 非常相似，但它让奖励模型（reward model）变成可选项，改用一个评分函数：答案正确时返回正值奖励，否则返回 0。
+
+举例来说，想想为 RLHF 与 RLVR 评分回应有多么不同。在 RLHF 中，奖励模型必须评估主观的质量：
+
+> **提示（Prompt）**：请解释经济学中机会成本（opportunity cost）的概念。
+>
+> **回应（Response）**：机会成本是你在做决策时所放弃的次佳选项的价值。例如，如果你花一小时读书而不是去工作，机会成本就是你原本可以赚到的工资……
+
+为这个回应评分，需要判断清晰度、准确性、完整性与有用性——这些质量全都需要习得的偏好，而且不存在一个明确的正确答案。
+
+相较之下，RLVR 使用会返回明确分数的验证函数（verification functions）。以数学为例：
+
+> **提示（Prompt）**：所有小于 20 的质数之和是多少？
+>
+> **回应（Response）**：小于 20 的质数为 2、3、5、7、11、13、17 与 19。将它们相加：$2 + 3 = 5$，接着 $5 + 5 = 10$，接着 $10 + 7 = 17$，接着 $17 + 11 = 28$，接着 $28 + 13 = 41$，接着 $41 + 17 = 58$，最后 $58 + 19 = 77$。答案是 $\boxed{77}$。
+>
+> **验证（Verification）**：`extracted_answer == 77` $\rightarrow$ 奖励 = 1
+
+`\boxed{}` 标记是从数学排版惯例中借来的做法，它让答案抽取变得非常直接——用一个简单的正则表达式（regular expression）就能从回应中抽出最终答案，无论模型是如何得出这个答案的。请注意，也存在其他答案抽取方法，例如仅使用「答案是：」（"The answer is:"）这样的词组（如上例所示）、`<answer>` 之类的特殊 token，或 `####` 之类的分隔符号。
+
+对于代码生成，验证通常采取单元测试（unit tests）的形式：
+
+> **提示（Prompt）**：请写一个 Python 函数 `fib(n)`，返回第 n 个费波那契数（Fibonacci number），其中 fib(0) = 0 且 fib(1) = 1。
+>
+> **回应（Response）**：
+>
+> ```python
+> def fib(n):
+>     if n < 2:
+>         return n
+>     return fib(n - 1) + fib(n - 2)
+> ```
+>
+> **验证（单元测试）（Verification (unit tests)）**：
+>
+> ```python
+> assert fib(0) == 0    # 基本情况（base case）
+> assert fib(1) == 1    # 基本情况（base case）
+> assert fib(10) == 55  # 较大的值（larger value）
+> ```
+>
+> （所有测试通过 $\rightarrow$ 奖励 = 1）
+
+单元测试是代码天然的验证函数：它们以已知的输入—输出配对来执行模型的解答。一种常见的评分方式是进行简单的闸控（gating）：若所有断言（assertions）都通过，奖励为 1；只要有任何一个失败，奖励为 0。其他设定则采用与通过测试数成正比的部分给分。对于这两个例子而言，都不需要习得的奖励模型，而且大多数设定也确实不使用（因为模型在这些领域对过度优化 over-optimization 具有稳健性），不过也可以透过奖励的线性组合来纳入一个奖励模型。
+
+RLVR 背后的想法在 RL 文献中并不新颖——根据答案是否正确来进行梯度更新，这个核心概念几乎就是强化学习的教科书定义。将其应用于语言模型时的创新之处，主要在于如何在维持被微调模型强大且通用的能力的同时进行应用。在此之中，语言建模文献里也有许多相关的想法，让模型从关于答案正确性的反馈中学习。
+
+最初，在我参与、创造出「可验证奖励 RL（RLVR）」一词的那项工作中 [6]，这个方法原本要被命名为「标准答案奖励 RL」（RL with Ground Truth rewards, RLGT）。然而 RLVR 与单纯从标准答案（ground truth）学习有着微妙的差异。在数学等领域中，存在单一的标准答案可用来验证解答，如同前面所见。在其他领域，例如代码生成或精确的指令遵循（instruction following），答案可以透过检查函数（例如单元测试）来验证——即使存在多个正确解答，而非只有单一的标准答案。RLVR 进展的核心，在于拥有种类多样且有深度的可验证问题，即便确切的解答无法事先得知。
+
+![图](../webapp/assets/figures/fig-p096-1.png)
+*图 25：以 RL 反馈循环形式呈现的 RLVR。这里以验证函数取代了奖励模型。*
+
+最早成功部署这类训练的模型是 OpenAI 的 o1 [53] 与开放权重（open-weight）模型 DeepSeek R1 [15]。此后不久，整个 AI 产业都将这种训练流程与模型风格列为优先事项。这里的核心变化，与其说是这种 RL 设定本身是全新的，不如说是训练阶段的重新配置与不同行为优先级的调整。推理模型带来了一个「扩展 RL 训练成为理所当然」的时代。
+
+至于这些模型展现出何种行为，请看以下例子：比较 DeepSeek V3 0325 与他们的推理模型 DeepSeek R1，对查询 `Write me a short poem about a goldfish`（帮我写一首关于金鱼的短诗）的回应。DeepSeek V3 非常直截了当：
+
+> **回应（Response）**：金鱼之梦（Goldfish Dreams）
+>
+> 在清澈浑圆的玻璃缸里，
+> 一尾小金鱼无声地游弋。
+> 鳞片闪耀如阳光的亲吻，
+> 牠悠然漂荡在水中的幸福里。
+>
+> 鱼鳍一拨，光影一闪，
+> 在光线中追逐着泡泡。
+> 牠是否梦想着辽阔的海洋？
+> 还是小小世界已然足够——那是牠的骄傲？
+
+而 DeepSeek R1 的体验则不同。它会先生成大量的思考 token 来构思回应，然后才回复用户。答案呈现如下：
+
+> **回应（Response）**：`<thinking>` 好的，用户想要一首关于金鱼的短诗。先来脑力激荡一些与金鱼相关的意象。金鱼通常养在鱼缸里，对吧？所以也许可以从场景开始。「鎏金之缸（gilded bowl）」或「水晶球（crystal globe）」这类词应该可行。
+>
+> 接着，想想金鱼的动作。牠们游得很流畅，所以会想到「疾游（dart）」、「滑行（glide）」或「回旋（swirl）」这类词。也许可以把牠们的鱼鳍形容成「丝绸般的（silken）」，以强调纤细感。
+>
+> 然后，考虑金鱼周遭的环境。阳光穿过水面会产生粼粼波光。「阳光起舞（sunbeams dance）」或「涟漪回旋（ripples spin）」这类词或许能捕捉那种感觉。加入城堡或鹅卵石之类的元素会增添俏皮感。
+>
+> 主题呢？也许是金鱼的小小世界与牠对自由的感知之间的对比。鱼缸如同一个宇宙，微小却完整。以一种神秘感或静默的凝视作结，可以增加深度。需要保持简洁，也许四段、带押韵。让我检查一下节奏与流畅度。避免陈腔滥调，但要平易近人。好，来把它组合起来。`</thinking>`
+>
+> 液态玻璃中的鎏金之梦（Gilded Dreams in Liquid Glass）
+>
+> 鎏金之缸，水晶之球，
+> 微小的潮汐在寂静中流淌——
+> 一抹橙色的闪光，一袭轻声的罗衣，
+> 你疾游过阳光照亮的靛蓝。
+>
+> 你的世界很小，却也无边无际——
+> 每颗鹅卵石、每座城堡、每株舒展的水草。
+> 水面将天空折成蔚蓝，
+> 涟漪旋转着你的液态世界。
+>
+> 你滑行过我们永远无从知晓的神话，
+> 一位静默的君王，隐身于薄雾。
+> 梦，是否随泡泡漂向远方？
+> 还是化作紫水晶中的记忆？
+>
+> 我们看着你描摹你无尽的圆——
+> 一滴泪中的宇宙。
+
+`<thinking>` 标签中的 token 就是模型的推理。对于更复杂的问题，推理阶段可能需要数千个 token 才会产出答案。因此，长上下文（long-context）语言模型是进阶推理行为的先决条件，但那不是本章的焦点。
+
+关于*这种训练如何运作*的核心直觉是：对于一个给定的模型，我们重复以下循环：
+
+1. 对多个问题采样多个答案，
+2. 朝着正确的答案进行梯度更新，然后
+3. 重复这个过程，反复使用同样的数据。
+
+值得注意的是，这个极其简单的方法（在数据分布经过细心设计、训练基础设施稳定的前提下）能让模型透过一遍又一遍地重访相同的问题来学习。更了不起的是，模型在这些训练问题上的进步，能够泛化到它从未见过的问题与（部分）领域！
+
+这个简单的方法让模型得以在行为空间（behavior space）中进行轻量的搜索，而 RL 算法则提高那些与正确答案相关的行为出现的可能性。
+
+## 7.2 新推理模型的起源（The Origins of New Reasoning Models）
+
+在此我们详述导致 2025 年推理模型爆发的高层次趋势。
+
+### 7.2.1 为什么 RL 现在行得通了？（Why Does RL Work Now?）
+
+尽管有许许多多「RL 还行不通」的评论 [148]，以及详述 RL 深层可重现性问题的论文 [149]，这个领域仍然克服了这些障碍，找到了高影响力的应用。其中一些已在本书中介绍，例如 ChatGPT 的 RLHF 与 DeepSeek R1 的 RLVR，但还有许多其他应用，包括改善芯片设计 [150]、精通电玩游戏 [151]、自动驾驶 [152] 等等。以 RL 为核心的语言模型训练起飞，显示这个研究领域在许多根本问题上取得了进展，包括：
+
+- **RL 的稳定性是可以解决的**：自 RL 诞生以来，限制其普及的因素一直是稳定性。这体现在两个方面。首先，学习本身可能反复无常、不总是有效。其次，众所皆知，这种训练比标准语言模型训练更脆弱，更容易出现损失尖峰（loss spikes）、崩溃等问题。如今无数新模型的发布都在预训练基础模型之上使用这种带有可验证奖励的 RL 训练风格，学术界也已大量采纳。RL 的技术进入门槛正处于历史最低点。
+- **开源版本早已「存在」**：许多用于以 RLVR 及相关技术训练语言模型的工具早已存在。例子包括 TRL [47]、Open Instruct [6]、veRL [153] 与 OpenRLHF [154]，其中许多都建立在 RLHF 与后训练发展历程中较早期的优化成果之上。工具的可及性正在催生规模庞大且不断加速的研究。
+
+多方数据显示，用于推理的 RL 训练大约要到 2024 年之后推出的领先模型上才变得可行，这表示模型必须先具备一定水平的底层能力，推理训练才有可能成功。
+
+### 7.2.2 RL 训练与推论时扩展（RL Training vs. Inference-Time Scaling）
+
+以强化学习训练来引出推理行为及可验证领域上的性能，与推论时扩展的概念密切相关。推论时扩展，又称测试时扩展（test-time scaling），是指在推论阶段使用更多运算能力，以便在下游任务上表现更好的一大类方法。在 DeepSeek R1 与 OpenAI o1 发布之前，推论时扩展的方法就已被研究——而这两者的发布大幅推升了各界对 RL 训练的投资热潮。例子包括价值引导采样（value-guided sampling）[155]，或搭配答案抽取的重复随机采样 [156]。除此之外，推论时扩展还可以用来改进思维链（chain-of-thought）推理解题以外的更多 AI 训练方法，例如让奖励模型深入考量各个选项 [84] [157]。
+
+RL 训练是通往「推论时扩展定律（inference-time scaling laws）被实际运用」的一条捷径，但长期而言，我们将拥有更多方法来引出我们所需的推论时权衡，以达到最佳性能。以 RL 大量训练模型，通常能让模型在每个回应中生成更多 token，且这种增加与下游性能的提升高度相关（虽然序列长度增加是默认的行为，但也有研究明确探讨*不*依赖这种推论时扩展来提升性能）。这与早期 RLHF 系统中所见的长度偏差（length-bias）[10] 有着本质上的不同——在那些系统中，人类偏好训练的副作用是拉长回应的平均长度，以换取偏好排名上的微幅提升。
+
+除了核心的 RL 训练模型之外，还有许多方法正被探索，以持续推进推理与推论时运算的极限。由于这些方法演进迅速，大多超出本书的范围，但它们包括：透过指令微调将较大 RL 训练模型的推理行为蒸馏（distill）到较小模型 [158]、组合更多推论调用 [159] 等等。这里的重点在于下游性能与生成 token 数量增加之间的相关性——否则那只是浪费能源。
+
+### 7.2.3 RLVR 的未来（超越推理）（The Future (Beyond Reasoning) of RLVR）
+
+在许多领域中，这些新形态的 RLVR 因为聚焦于性能而非行为，而与开发者的目标更加一致。标准的微调 API 通常使用参数高效微调方法，例如 LoRA（Low-Rank Adaptation，一种只训练少量附加矩阵而非全部模型权重的参数高效方法，也称为参数高效微调 parameter-efficient fine-tuning, PEFT），搭配针对指令的监督式微调。开发者传入提示（prompts）与完成文本（completions），模型透过更新参数去匹配这些完成文本，从而提高你的数据中的特征在模型生成内容中出现的频率。
+
+RLVR 则聚焦于匹配答案。给定查询与正确答案，RLVR 帮助模型学会产出正确答案。标准指令微调通常只对数据进行 1 到 2 个 epoch 的损失更新，而 RLVR 之所以独树一格，正是因为它会在同样少量的数据点上进行数百甚至数千个 epoch，让模型有时间学习新的行为。这可以视为：把基础模型版本中偶尔才会奏效的正向行为，经过 RLVR 强化为稳健的行为。
+
+**语言模型 RL 训练的适用范围持续扩大**：从根本的科学层面来看，o1 与 R1 带来的最大启示是——我们拥有了更多方法，可以把语言模型训练出潜在有价值的行为。研究者与工程师可用的门路越多，我们就越应该对 AI 的整体发展轨迹感到乐观。
+
+## 7.3 理解推理训练方法（Understanding Reasoning Training Methods）
+
+对推理的投资，促成了「如何训练模型遵循人类指令」这门技艺的一次重大演进。这些训练配方仍然使用前面章节讨论过的常见组件（如第 3 章对 DeepSeek R1 配方的概述所述），包括指令微调（instruction fine-tuning）、基于人类反馈的强化学习，以及可验证奖励强化学习（RLVR）。核心的变化在于使用多得多的 RLVR，并以不同的顺序应用其他训练技术——传统上，对推理模型而言，核心的训练步骤要嘛是一次大规模的 RL 训练，要嘛是在另一个已经历大量 RLVR 训练的模型的*输出*上进行大规模指令微调（称为蒸馏 distillation）。
+
+### 7.3.1 OpenAI o1 与 DeepSeek R1 之前的推理研究（Reasoning Research Before OpenAI o1 or DeepSeek R1）
+
+在推理模型起飞之前，学界已投入大量心力研究如何训练语言模型在可验证领域上表现更好。下列这些工作的主要差异在于：它们的方法论未能扩展到 DeepSeek R1 及后续模型所使用的规模，或者它们产出的模型牺牲了整体性能，以换取更高的数学或程序撰写能力。这里纳入其背后的想法与动机，是为了描绘出推理模型如何在整个领域版图中诞生的更完整图像。
+
+在可验证领域上训练语言模型的最早尝试，包括自学推理器（self-taught reasoner, STaR）系列工作 [160] [161] 与 TRICE [162]，两者都在 2022 至 2023 年间使用标准答案奖励信号来鼓励模型进行思维链推理。STaR 实质上是对策略梯度（policy gradient）算法的近似，但在实际应用中以不同方式过滤样本，并使用交叉熵（cross-entropy）度量而非对数概率（log-probability）；Quiet-STaR 则在此基础上扩展，其想法与近期的推理模型非常相近——让模型在尝试回答可验证问题之前先生成 token（这有助于训练效果）。TRICE [162] 也透过生成推理轨迹（traces），再以一种受马可夫链蒙地卡罗（Markov chain Monte Carlo）启发的客制化期望最大化（expectation maximization）算法进行优化，来改善推理。VinePPO [163] 接续这些工作，采用了更贴近现代推理模型的设定。VinePPO 使用以 PPO 为基础的算法，以数学题正确与否作为二元奖励，在 GSM8K 与 MATH 上训练。其他在 OpenAI o1 与 DeepSeek R1 之前的工作，则使用代码执行作为训练的反馈信号 [164], [165]，或使用定理证明的验证（在该文中称为「验证器反馈强化学习」Reinforcement Learning from Verifier Feedback, RLVF）[166]。Tülu 3 在这些方法的基础上更进一步，使用一个简单的 PPO 训练器来奖励答案正确的完成文本——最重要的是，同时维持模型在广泛评测软件包上的整体性能。Tülu 3 与现代推理训练技术的二元奖励，可以与 STaR 的迭代式方法或 Quiet-STaR 的对数似然（log-likelihood）奖励形成对比。
+
+### 7.3.2 早期推理模型（Early Reasoning Models）
+
+表 4 汇整了 DeepSeek R1 之后具奠基性的推理研究报告，其中部分还伴随开放数据与模型权重一同发布。
+
+表 4：2025 年——即以 RLHF 进行大规模推论时扩展的第一年——值得注意的推理模型技术报告摘要。
+
+| 日期 | 名称 | 摘要（TLDR） | 开放权重 | 开放数据 |
+|------|------|------|------|------|
+| 2025-01-22 | DeepSeek R1 [15] | 以 RL 为基础的 DeepSeek 升级版，在数学与代码推理上大幅进步 | 是 | 否 |
+| 2025-01-22 | Kimi 1.5 [143] | 在中／英文数据上扩展 PPO/GRPO；AIME 数学表现强劲 | 否 | 否 |
+| 2025-03-31 | Open-Reasoner-Zero [167] | 对基础模型 RL 的完全开放复现 | 是 | 是 |
+| 2025-04-10 | Seed-Thinking 1.5 [62] | ByteDance 的 RL 流程，具备动态 CoT 闸控 | 是 | 否 |
+| 2025-04-30 | Phi-4 Reasoning [168] | 14B 模型；精心设计的 SFT→RL；擅长 STEM 推理 | 是 | 否 |
+| 2025-05-02 | Llama-Nemotron [169] | 多种尺寸的「推理开关（reasoning-toggle）」模型 | 是 | 是 |
+| 2025-05-12 | INTELLECT-2 [134] | 首个公开记录的全球去中心化 RL 训练 | 是 | 是 |
+| 2025-05-12 | Xiaomi MiMo [61] | 从预训练到后训练的端到端推理流程 | 是 | 否 |
+| 2025-05-14 | Qwen 3 [60] | 将类似 R1 的配方应用于新模型 | 是 | 否 |
+| 2025-05-21 | Hunyuan-TurboS [170] | Mamba-Transformer MoE，自适应长／短 CoT | 否 | 否 |
+| 2025-05-28 | Skywork OR-1 [171] | 避免熵崩塌（entropy collapse）的 RL 配方；在 AIME 上胜过 DeepSeek | 是 | 是 |
+| 2025-06-04 | Xiaomi MiMo VL [172] | 将推理流程端到端调整为纳入多模态任务 | 是 | 否 |
+| 2025-06-04 | OpenThoughts [173] | 从 QwQ-32B 蒸馏出的 120 万笔范例公开指令数据集 | 是 | 是 |
+| 2025-06-10 | Magistral [174] | 在 Mistral 3 上的纯 RL；多语言 CoT；开源发布小模型 | 是 | 否 |
+| 2025-06-16 | MiniMax-M1 [123] | 开放权重 456B MoE 混合式／Lightning Attention 推理模型；1M 上下文；以 CISPO 进行 RL；发布 40K/80K 思考预算（thinking-budget）检查点 | 是 | 否 |
+| 2025-07-10 | Kimi K2 [175] | 1T MoE（32B 启用），采用 MuonClip（QK-clip）确保稳定性；15.5T token 预训练且无损失尖峰；多阶段后训练，结合代理式（agentic）数据合成与联合 RL；发布基础与后训练检查点。 | 是 | 否 |
+| 2025-07-28 | GLM-4.5 [176] | 开放权重 355B-A32B MoE「ARC」模型，具思考／非思考模式；23T token 多阶段训练，后训练采专家迭代（expert iteration）与 RL；发布 GLM-4.5 与 GLM-4.5-Air（MIT 授权）。 | 是 | 否 |
+| 2025-08-20 | Nemotron Nano 2 [177] | 针对长「思考轨迹（thinking traces）」的混合 Mamba-Transformer；20T token 的 FP8 预训练后进行压缩／蒸馏；明确发布多个检查点及「大部分」预训练／后训练数据集。 | 是 | 是（大部分） |
+| 2025-09-09 | K2-Think [178] | 参数高效的数学推理系统：一个 32B 开放权重模型，附测试时扩展配方；（依发布数据）定位为完全开放，含训练数据／代码。 | 是 | 是 |
+| 2025-09-23 | LongCat-Flash-Thinking [179] | 560B MoE 推理模型；报告明确说明从长 CoT 冷启动（cold start）到大规模 RL 的分阶段配方；开源发布。 | 是 | 否 |
+| 2025-10-21 | Ring-1T [180] | 以 RL 扩展为焦点的兆级参数「思考模型」；报告阐述在 1T 规模下扩展 RL 的瓶颈与解方，并发布开放模型。 | 是 | 否 |
+| 2025-11-20 | Olmo 3 Think [18] | 完全开放的「模型流（model flow）」发布：报告完整的生命周期（各阶段、检查点与数据点），并将 Olmo 3 Think 32B 定位为旗舰级开放思考模型。 | 是 | 是 |
+| 2025-12-02 | DeepSeek V3.2 [181] | 开放权重 MoE 的前沿推进，其报告聚焦注意力效率的变革、RL 框架升级，以及针对代理式／推理性能的数据合成。 | 是 | 否 |
+| 2025-12-05 | K2-V2 [182] | 从零开始训练的 70B 稠密「360 度开放（360-open）」模型；采三档强度（3-effort）纯 SFT 后训练以实现可控思考。 | 是 | 是 |
+| 2025-12-15 | Nemotron 3 Nano [183] | 30B-A3B MoE 混合 Mamba-Transformer；以 25T token 预训练，包含 SFT 与大规模 RL；明确表示同时发布权重、配方／代码与大部分训练数据。 | 是 | 是（大部分） |
+| 2025-12-16 | MiMo-V2-Flash [184] | 为速度优化的 309B MoE（15B 启用）：混合 SWA/GA 注意力（5:1、128-token 窗口）加轻量 MTP；27T token 的 FP8 预训练；后训练采 MOPD 与大规模代理式 RL，强化推理／程序撰写。 | 是 | 否 |
+
+### 7.3.3 训练推理模型的常见实践（Common Practices in Training Reasoning Models）
+
+在本节中，我们详述在训练推理模型时，用于安排训练阶段顺序与调整数据以最大化性能的常见方法。
+
+请注意，这些论文可能使用了某项列出的技术却未提及，而它们的同侪则有提及；因此这些例子只是已知实现的一个子集，应作为参考，而非对最佳配方的最终定论。
+
+- **离线难度过滤（Offline difficulty filtering）**：RLVR 的一个核心直觉是，模型只能从存在梯度的范例中学习。如果 RLVR 的起始模型对某个问题的解题率是 100% 或 0%，那么针对该提示的不同完成文本之间就不会有梯度（也就是说，对策略梯度算法而言，所有策略看起来都一样）。许多模型在开始大规模 RL 之前会使用难度过滤，将训练问题限缩在起始模型解题率仅为 20–80% 的那些题目。收集这种数据的方式是：对训练集中的每个提示采样 N 个（例如 16 个）完成文本，并验证其中正确的比例。Seed-Thinking 1.5、Open Reasoner Zero、Phi 4、INTELLECT-2、MiMo RL、Skywork OR-1 等模型都使用了此方法的各种变体。
+- **逐批次在线过滤（Per-batch online filtering）**（或贯穿训练全程的难度课程 difficulty curriculums）：在以离线过滤找出合适训练问题之外，另一个重要问题是：在学习过程中，问题应该以什么顺序呈现给模型？为了解决这个问题，许多模型会对批次（batch）中的问题进行在线过滤、使用预先建构的课程／数据调度器（data schedulers）、将较难的问题留到训练后期，或采用其他改善长期稳定性的做法。Kimi 1.5、Magistral、Llama-Nemotron、INTELLECT-2、MiMo-RL、Hunyuan-TurboS 等模型使用了相关的想法。
+- **移除 KL 惩罚（Remove KL penalty）**：随着推理模型的 RL 训练长度（无论以何种指标计算——总 GPU 小时数、FLOPS 或 RL 步数）相较于 RLHF 训练大幅增加，加上奖励函数变得较不容易被过度优化，许多模型移除了 KL 惩罚——该惩罚原本用于约束 RL 学到的策略必须与训练起点的基础模型保持相似。移除后，模型在训练过程中得以进一步探索。RAGEN [185]、Magistral、OpenReasonerZero、Skywork OR-1 等模型采用了这个做法。
+- **放宽策略梯度裁剪（Relaxed policy-gradient clipping）**：GRPO 算法的新变体（例如 DAPO [129]）提出对 GRPO（或 PPO）所用的双边裁剪目标函数进行修改，以促进更好的探索。研究也显示，当奖励不完美时，裁剪可能造成虚假的学习信号 [186]。这种在不同梯度方向使用不同范围的双边裁剪，被 RAGEN、Magistral、INTELLECT-2 等模型采用。
+- **离策略数据（或完全异步更新）（Off-policy data (or fully asynchronous updates)）**：随着问题变难，用 RL 解题所需的完成文本长度急遽增加（尤其是回应长度的*方差*——经常出现长度极长的离群值），RL 训练中的计算资源可能因此闲置。为了解决这个问题，训练正朝着异步更新，或改变问题编排进批次的方式来提升整体吞吐量的方向发展。Seed-Thinking 1.5、INTELLECT-2 等模型使用了从部分到完全异步的（离策略 off-policy）数据。
+- **额外的格式奖励（Additional format rewards）**：为了让推理过程可预测，许多模型会加入小额奖励，确保模型在回答前遵循正确的格式，例如 `<think>...</think>`。DeepSeek R1、OpenReasonerZero、Magistral、Skywork OR-1 等模型使用了这个做法。
+- **语言一致性奖励（Language consistency rewards）**：与格式奖励类似，一些多语言推理模型使用语言一致性奖励，优先鼓励在推理过程中不切换语言的模型（以带来更好、更可预测的用户体验）。DeepSeek R1、Magistral 等模型属于此类。
+- **长度惩罚（Length penalties）**：许多模型在 RL 训练期间使用各种形式的长度惩罚，以随时间稳定学习过程，或缓解在困难问题上的过度思考（overthinking）。例子包括 Kimi 1.5 逐步延长目标长度以对抗过度思考（同时在难度课程中维持高训练准确率），或 INTELLECT-2 全程施加小幅的长度惩罚。逐步延长训练序列长度可以缓解过度思考：先迫使模型在思考预算较有限的情况下学会有效推理，然后再过渡到更长的训练，让模型能在更复杂的问题上有效率地运用这些行为。其他模型则使用超长过滤（overlong filtering）及其他相关实现来提升吞吐量。
+- **损失归一化（Loss normalization）**：关于原始 GRPO 算法的逐群组（per-group）归一化项可能引入长度或难度偏差，已有一些讨论（见策略梯度章节或 [118]）。因此，一些模型（例如 Magistral 或 MiMo）选择在批次层级而非群组层级对损失或优势（advantages）进行归一化。
+- **平行测试时运算扩展（Parallel test-time compute scaling）**：结合多个平行、独立采样的推演（rollouts）所产生的答案，相较于只使用单一推演的答案，可以带来显著的改善。最简单朴素的平行测试时运算扩展形式（DeepSeek-R1、Phi-4 等模型采用的做法），是把多数推演返回的答案当作最终答案。更进阶的技术是使用一个经过训练的评分模型，从平行推演的答案中挑选最佳答案。截至 2026 年，这项技术尚未在公开、有文件记录的推理模型配方中普及，但它曾在 Claude 4 的发布公告中被提及 [187]，并在 DeepSeek-GRM [157] 中被使用。
+
+在这些常见技术之外，关于推理训练如何在不牺牲附带能力的前提下打造出有用的模型，也有许多常见的发现：
+
+- **纯文字推理训练可提升多模态性能（Text-only reasoning boosts multimodal performance）**：Magistral、MiMo-VL 等发现，先训练一个多模态模型，然后在多模态训练之后进行纯文字的推理训练，可以*提升*最终模型的多模态性能。
+- **透过系统提示切换推理（或长度控制）（Toggleable reasoning with system prompt (or length control)）**：Llama-Nemotron、Nemotron Nano、Qwen 3、SmolLM 3 等使用特定的系统提示（system prompts）（可能搭配长度受控的 RL 训练 [188]），让用户可以开关思考长度。其他开放模型，例如 OpenAI 的 GPT-OSS 与 LLM360 的 K2-V2 [182]，则采用在系统提示中设定低—中—高推理强度（reasoning effort）的做法，但这类行为的训练方法目前还没有那么完善的文件记录。
+
+## 7.4 展望未来（Looking Ahead）
+
+推理模型的版图正以近年 AI 研究中任何领域都未曾有过的速度演进，本章列出的一些常见实践，终将不可避免地被新技术取代。
+
+目前已有数项工作正在进行，试图系统性地理解推理训练为何有效。Olmo 3 Think [18] 是对推理模型完整训练生命周期最全面的开放文件记录，为研究社群提供了每个阶段的检查点与数据以供研究，并以一场在 220 颗 GPU 上长达近 4 周的训练作结。同样地，关于理解 RL 用于推理的扩展特性的研究 [17]，也开始将运算、数据与性能之间的关系形式化——这些关系过去只存在于实践工作者的直觉之中。
+
+可以确定的是，强化学习已经从蛋糕比喻中的「顶端樱桃」，毕业成为前沿模型训练中承重的核心组件。本章围绕 RLVR 概念的各项小技术——难度过滤、格式奖励等等——并非最终答案，但它们代表了这个领域目前对「如何从语言模型中引出推理」的最佳理解。下一代的方法很可能看起来会不一样，但它们将建立在此处奠定的基础之上。
+
+</script>
+<script src="../assets/marked.min.js"></script>
+<script src="../assets/katex/katex.min.js"></script>
+<script src="../assets/katex/auto-render.min.js"></script>
+<script src="../assets/widgets/ch07.js"></script>
+<script src="../assets/app.js"></script>
+<script src="../assets/gh-star.js"></script>
+</body>
+</html>

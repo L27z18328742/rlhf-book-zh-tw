@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>第 2 章　RLHF 简史 — RLHF 中文版</title>
+<link rel="stylesheet" href="../assets/katex/katex.min.css">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="../index.html">RLHF 中文版<span>从人类反馈中强化学习</span></a>
+  <nav class="chapnav"><a href="ch01.html">← 第 1 章</a><span class="chapnav-current">第 2 章　RLHF 简史</span><a href="ch03.html">第 3 章 →</a><a class="gh-star" href="https://github.com/ai-twinkle/rlhf-book-zh-tw" target="_blank" rel="noopener" data-gh-repo="ai-twinkle/rlhf-book-zh-tw"><span class="star-ico">★</span><span class="gh-label">Star</span><b class="gh-count" hidden></b></a></nav>
+</header>
+<div class="layout">
+  <aside class="sidebar"><nav id="toc" class="toc"><h2>本章目录</h2></nav></aside>
+  <main class="main">
+    <div id="lab-banner"></div>
+    <article id="content" class="prose"></article>
+    <section id="lab" class="lab" hidden>
+      <h2 class="lab-title">🧪 互动实验室</h2>
+      <div id="lab-intro"></div>
+      <div id="lab-root"></div>
+    </section>
+    <nav class="pager"><a class="prev" href="ch01.html"><span class="dir">← 上一章</span><div class="ttl">第 1 章　导论</div></a><a class="next" href="ch03.html"><span class="dir">下一章 →</span><div class="ttl">第 3 章　训练总览</div></a></nav>
+    <footer class="pagefoot">本站为 <a href="https://github.com/ai-twinkle">Twinkle AI Community</a>（台湾）的<strong>非官方社群翻译</strong>（unofficial community translation）· 译自 Nathan Lambert,《Reinforcement Learning from Human Feedback》（<a href="https://rlhfbook.com">rlhfbook.com</a>）· 依 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh-hans">CC BY-NC-SA 4.0</a> 授权，仅供学习研究、不得作商业用途。</footer>
+  </main>
+</div>
+<script type="text/markdown" id="chapter-md">
+# 第 2 章　RLHF 简史（A Tiny History of RLHF）
+
+> 译自 Nathan Lambert, *Reinforcement Learning from Human Feedback*（rlhfbook.com），2026-07-01 版，原文第 18–20 页。
+
+RLHF 及其相关方法都非常新。我们回顾这段历史，是为了呈现这些流程正式确立的时间有多晚近，以及这些文献纪录有多少存在于学术文献之中。借此，我们想强调 RLHF 正在快速演进，因此本章为全书铺陈背景：本书将对某些方法表达不确定性，并预期部分细节可能会围绕少数核心实践发生变化。此外，此处列出的论文与方法也展示了 RLHF 流程中各个组成部分的由来——因为其中一些开创性论文，原本是为了与现代语言模型截然不同的应用而写的。
+
+在本章中，我们详述让 RLHF 领域走到今日面貌的关键论文与项目。本章并非要对 RLHF 及相关领域做全面性的回顾，而是作为一个起点，重新讲述我们如何走到今天。本章刻意聚焦于促成 ChatGPT 的近期研究。在强化学习（Reinforcement Learning, RL）文献中，关于从偏好中学习还有大量后续研究 [31]。若需要更详尽的清单，你应该参考正式的综述论文 [32], [33]。
+
+![图](../webapp/assets/figures/fig-p018-1.png)
+*图 2：本章所讨论的 RLHF 关键发展时间轴，从早期基于偏好的 RL 研究，一路到 RLHF 在大型语言模型中的采用。*
+
+## 2.1 起源至 2018：基于偏好的 RL（Origins to 2018: RL on Preferences）
+
+这个领域近年随着深度强化学习（Deep Reinforcement Learning）的兴起而普及，并发展成许多大型科技公司对 LLM 应用的更广泛研究。尽管如此，今日使用的许多技术，仍与早期「从偏好中进行 RL」文献中的核心技术有着深刻的关联。
+
+最早采用与现代 RLHF 相似方法的论文之一是 *TAMER*。*TAMER: Training an Agent Manually via Evaluative Reinforcement* 提出了一种方法：由人类反复为智能体（agent）的行动评分，以学习一个奖励模型（reward model），再用该模型来学习行动策略（action policy）[34]。另有与其同期或稍晚的研究提出了一种演员-评论家（actor-critic）算法 COACH，利用人类反馈（包含正向与负向）来调整优势函数（advantage function）[35]。
+
+最主要的参考文献 Christiano et al. 2017，则是将 RLHF 应用于 Atari 游戏中智能体轨迹（trajectories）之间偏好的研究 [1]。这项引入 RLHF 的工作，紧接在 DeepMind 关于深度 Q 网络（Deep Q-Networks, DQN）强化学习的开创性研究之后——后者展示了 RL 智能体可以从零开始学会玩热门电子游戏。该研究显示，在某些领域中，让人类在轨迹之间做选择，可能比直接与环境互动更有效。这其中用到了一些巧妙的设定条件，但成果依然令人印象深刻。
+
+![图](../webapp/assets/figures/fig-p019-1.png)
+*图 3：Christiano et al.（2017）的 RLHF 核心循环：奖励预测器（reward predictor）以异步方式从轨迹片段的比较中训练，而智能体则最大化预测出的奖励。*
+
+这个方法后来被更直接的奖励建模（reward modeling）研究所扩展 [36]；而深度学习在早期 RLHF 研究中的采用，则以仅仅一年后将 TAMER 扩展至神经网络模型的研究画下高峰 [37]。
+
+这个时代开始出现转变：奖励模型作为一种一般性概念，被提出作为研究对齐（alignment）的方法，而不再只是解决 RL 问题的工具 [38]。
+
+## 2.2 2019 至 2022：语言模型上的人类偏好强化学习（2019 to 2022: RL from Human Preferences on Language Models）
+
+基于人类反馈的强化学习（reinforcement learning from human feedback）——在早期也经常被称为基于人类偏好的强化学习（reinforcement learning from human preferences）——很快就被日益转向扩展大型语言模型规模的 AI 实验室所采用。这类研究有很大一部分始于 2019 年的 GPT-2 与 2020 年的 GPT-3 之间。最早的研究是 2019 年的 *Fine-Tuning Language Models from Human Preferences*，它与现代的 RLHF 研究以及本书将涵盖的内容有许多惊人的相似之处 [39]。许多经典的概念，例如学习奖励模型、KL 距离（KL distances）、反馈流程图等，都是在这篇论文中正式确立的——尽管其最终模型的评估任务与能力，和今日人们所做的已有所不同。从这里开始，RLHF 被应用到各式各样的任务上。重要的例子包括：一般摘要（general summarization）[2]、书籍的递归式摘要（recursive summarization of books）[40]、指令遵循（instruction following）（InstructGPT）[3]、浏览器辅助问答（browser-assisted question-answering）（WebGPT）[4]、支持附引用来源的回答（GopherCite）[41]，以及一般对话（general dialogue）（Sparrow）[42]。
+
+除了应用之外，还有多篇开创性论文为 RLHF 的未来定义了几个关键领域，包括：
+
+1. 奖励模型过度优化（reward model over-optimization）[43]：RL 优化器对以偏好数据训练的模型产生过度拟合（over-fit）的能力；
+2. 将语言模型作为对齐研究的一般性研究领域 [23]；以及
+3. 红队测试（red teaming）[44]——评估语言模型安全性的流程。
+
+将 RLHF 精炼并应用于聊天模型的工作持续进行。Anthropic 在 Claude 的早期版本中持续大量使用它 [5]，早期的 RLHF 开源工具也随之出现 [45], [46], [47]。
+
+## 2.3 2023 至今：ChatGPT 时代（2023 to the Present: The ChatGPT Era）
+
+ChatGPT 发布时的公告，非常明确地说明了 RLHF 在其训练中扮演的角色 [48]：
+
+> 我们使用基于人类反馈的强化学习（RLHF）训练这个模型，采用与 InstructGPT 相同的方法，但在数据搜集的设定上略有差异。
+
+自那之后，RLHF 已被广泛用于各个领先的语言模型。众所周知，它被用于 Anthropic 为 Claude 打造的宪法式 AI（Constitutional AI）[24]、Meta 的 Llama 2 [49] 与 Llama 3 [29]、Nvidia 的 Nemotron [30]、Ai2 的 Tülu 3 [6] 等等。
+
+如今，RLHF 正在成长为一个更广泛的偏好微调（preference fine-tuning, PreFT）领域，包括一些新的应用，例如：针对中间推理步骤的过程奖励（process rewards）[50]，于第 5 章介绍；受直接偏好优化（Direct Preference Optimization, DPO）[25] 启发的直接对齐算法（direct alignment algorithms），于第 8 章介绍；从代码或数学的执行反馈中学习 [51], [52]，以及其他受 OpenAI 的 o1 [53] 启发的在线推理方法，于第 7 章介绍。
+
+</script>
+<script src="../assets/marked.min.js"></script>
+<script src="../assets/katex/katex.min.js"></script>
+<script src="../assets/katex/auto-render.min.js"></script>
+<script src="../assets/widgets/ch02.js"></script>
+<script src="../assets/app.js"></script>
+<script src="../assets/gh-star.js"></script>
+</body>
+</html>

@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>附录 B　不只是「风格」 — RLHF 中文版</title>
+<link rel="stylesheet" href="../assets/katex/katex.min.css">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="../index.html">RLHF 中文版<span>从人类反馈中强化学习</span></a>
+  <nav class="chapnav"><a href="appa.html">← 附录 A</a><span class="chapnav-current">附录 B　不只是「风格」</span><a href="appc.html">附录 C →</a><a class="gh-star" href="https://github.com/ai-twinkle/rlhf-book-zh-tw" target="_blank" rel="noopener" data-gh-repo="ai-twinkle/rlhf-book-zh-tw"><span class="star-ico">★</span><span class="gh-label">Star</span><b class="gh-count" hidden></b></a></nav>
+</header>
+<div class="layout">
+  <aside class="sidebar"><nav id="toc" class="toc"><h2>本章目录</h2></nav></aside>
+  <main class="main">
+    <div id="lab-banner"></div>
+    <article id="content" class="prose"></article>
+    <section id="lab" class="lab" hidden>
+      <h2 class="lab-title">🧪 互动实验室</h2>
+      <div id="lab-intro"></div>
+      <div id="lab-root"></div>
+    </section>
+    <nav class="pager"><a class="prev" href="appa.html"><span class="dir">← 上一章</span><div class="ttl">附录 A　定义</div></a><a class="next" href="appc.html"><span class="dir">下一章 →</span><div class="ttl">附录 C　实践议题</div></a></nav>
+    <footer class="pagefoot">本站为 <a href="https://github.com/ai-twinkle">Twinkle AI Community</a>（台湾）的<strong>非官方社群翻译</strong>（unofficial community translation）· 译自 Nathan Lambert,《Reinforcement Learning from Human Feedback》（<a href="https://rlhfbook.com">rlhfbook.com</a>）· 依 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh-hans">CC BY-NC-SA 4.0</a> 授权，仅供学习研究、不得作商业用途。</footer>
+  </main>
+</div>
+<script type="text/markdown" id="chapter-md">
+# 附录 B　不只是「风格」（Beyond "Just Style"）
+
+> 译自 Nathan Lambert, *Reinforcement Learning from Human Feedback*（rlhfbook.com），2026-07-01 版，原文第 231–235 页。
+
+RLHF 的早期发展让它背上了「只是风格转换（style transfer）」的名声；其他严厉的批评则聚焦于 RLHF 如何操纵信息在输出中的呈现方式。本附录要说明的是：为什么「风格」是理解 RLHF 所提供价值的核心——以及为什么它对模型能力与用户体验都有正面的影响。
+
+「RLHF 只不过是风格转换」这种想法，基于两个原因拖累了 RLHF 的整体叙事。第一个原因是，RLHF 因此被联想成只是对模型做些微小、无关紧要的改动。当人们谈论风格转换时，不会把它描述成重要或令人兴奋的事——他们认为那很表面。然而，风格是人类价值取之不竭的来源；这正是为什么重新讲述既有的故事也能造就新的畅销书（例如《人类大历史》（*Sapiens*）），而且风格是我们的智识生态系持续进步的根本环节。风格与信息本身是交织在一起、密不可分的。
+
+第二个原因是，许多人忽略了一个事实：做得好的 RLHF 能提升模型在主流 LLM 评测上的分数。我们已经在 Llama 3 上看到，不同的风格确实能有意义地改善评测结果 [29]。Llama 3 Instruct 系列模型在 Arena 上得分极高，而普遍接受的解释是它们的个性比较有趣——比起同时代的其他模型，它们更简洁也更机智。撇开许多 LLM 用户执着的基准测试分数不谈，如果 RLHF 能单纯让语言模型变得更有趣，那本身就是实实在在交付出去的价值。
+
+在本附录中，「话多」（chattiness）一词用来涵盖以 RLHF 训练的模型回应长度不断增加的现象，但它也涵盖了诸如大量使用 Markdown、表情符号（emoji），以及把答案编排成条列式清单等技巧。为了让本附录的讨论有具体依据，下面展示了同属 Tülu 3 家族的两个模型的补全范例——其一仅经过指令微调（instruction fine-tuning），其二则额外套用了透过长度控制 DPO（length-controlled DPO）进行的偏好微调（preference fine-tuning）。首先是指令微调模型对提示 `What is reinforcement learning from human feedback?`（什么是基于人类反馈的强化学习？）的补全结果（确切模型为 Llama 3.1 Tulu 3 70B SFT）[6]：
+
+```
+基于人类反馈的强化学习（reinforcement learning from human feedback），又称人在回路
+中的强化学习（human-in-the-loop reinforcement learning），是机器学习的一个子领域，
+其主要目标是透过纳入来自人类的反馈来训练强化学习智能体执行任务。这些反馈可以有多种形式，
+例如二元奖励（如「对」或「错」）、标量奖励、行动之间的偏好、示范、自然语言指令，或对代理
+人行为的纠正。
+
+基于人类反馈的强化学习背后的想法，是利用人类的直觉与决策能力来引导智能体的学习过程。在传
+统的强化学习中，智能体透过与环境互动，并依据那些互动的结果获得奖励或惩罚来学习做决策。然
+而，定义一个合适的奖励函数可能既困难又耗时，往往导致奖励塑形（reward shaping）或奖励骇
+客（reward hacking）——也就是智能体找到出乎意料且往往非预期的方式来最大化奖励。
+
+透过使用人类反馈，强化学习可以让人类直接影响学习过程，从而解决其中一些问题。人类训练者可
+以提供即时反馈、依任务的复杂度调整反馈的规模，并根据智能体的进展更新反馈。这种做法可以造
+就更稳健、更具泛化能力的智能体，因为引导它们的不是手工打造的奖励函数，而是人类训练者细致
+的理解与经验。
+
+然而，基于人类反馈的强化学习面临若干挑战，例如取得人类反馈的高昂成本、主观且不一致的反馈、
+规模化的问题，以及如何有效率且有效地将人类反馈集成进学习算法的方法。尽管有这些挑战，这
+个领域的研究已在多种应用中展现出可观的成果，包括机器人学、电子游戏、义肢控制、自然语言处
+理等等。
+```
+
+接着是经过 RLHF 之后、来自 Llama 3.1 Tulu 3 70B DPO 的补全结果：
+
+```
+基于人类反馈的强化学习（RLHF）是强化学习（RL）的一个子集，其中引导学习过程的奖励是由人
+类提供的，而不是一个预先指定的数值奖励函数。这在难以或无法设计出合适奖励函数的情境中特别
+有用，或者当所期望的表现涉及只有人类才具备独特能力提供的主观判断时亦然。
+
+在传统的强化学习中，智能体与环境互动。每一次互动中，智能体执行一个行动、接收一个观测，并
+得到一个数值奖励，告诉它在该情境下表现得如何。透过大量这样的互动，智能体学会最大化累积奖
+励。
+
+相较之下，在基于人类反馈的强化学习中：
+
+1. **人类输入：** 反馈不是来自预先定义的奖励函数，而是来自人类评估者，由他们对智能体的
+表现提供定性的、主观的判断。这些反馈可以有多种形式，例如数值评分、二元偏好信号、自然语言
+反馈，甚至是展示如何改进的示范。
+
+2. **反馈循环：** 人类评估者观察智能体的行动或结果，并即时（或近乎即时）提供反馈。代理
+人透过这个迭代的反馈循环学习，逐步调整其行为，使之更贴近人类偏好。
+
+3. **奖励塑形：** 由于原始的人类反馈存在变异性与潜在偏误，不一定能直接用于学习算法，
+因此可能需要一个奖励塑形的过程，将人类反馈转换成一个更稳定、能引导学习的信号。
+
+4. **基于偏好的 RL：** RLHF 中一种常见的做法是基于偏好的强化学习，也就是透过比较成对的
+行动（或结果），并接收人类对于何者较佳的反馈来训练智能体。智能体从这些成对比较中推断出一
+个奖励函数，用来引导其行动。
+
+5. **逆向强化学习（IRL）：** RLHF 使用的另一种技术是 IRL，其目标是推断出能够解释人类行
+动或决策的底层奖励函数，然后用该奖励函数来训练智能体。
+
+**应用：**
+
+基于人类反馈的强化学习已在以下领域找到应用：
+
+- **机器人学：** 教机器人执行那些难以用预先定义的奖励函数来描述的任务。
+- **游戏对弈：** 人类反馈可以引导 AI 智能体更好地模仿类似人类的策略或行为。
+- **语言与内容生成：** 例如，以提示性的方式引导 AI 模型生成更连贯、更有创意或更有帮助的
+内容。
+- **推荐系统：** 人类反馈有助于调整并改善提供给用户的推荐。
+
+**挑战：**
+
+使用人类反馈会带来一些特有的挑战：
+
+1. **可扩展性：** 收集人类反馈既耗时又昂贵，而且难以扩展到复杂或高维度的任务。
+2. **偏误与噪声：** 人类反馈可能充满噪声、不一致且带有偏误，导致次佳的学习结果。
+3. **对齐：** 要确保强化学习智能体对齐的是人类评估者真正的偏好，而不只是表面的反馈，是
+一件困难的事。
+4. **安全与滥用：** 使用可能有缺陷的人类反馈，会引发安全与伦理层面的疑虑，尤其是当反馈
+流程遭到破坏或被操弄时。
+
+研究人员正积极研究各种技术来缓解这些挑战并改进 RLHF 方法。其中一种做法是利用机器学习模
+型来放大人类反馈的效力，例如：学习从稀疏的人类输入中进行泛化，或在无法取得直接人类输入
+的情境中合成合理的反馈。
+```
+
+DPO 模型的回应包含类似的信息，因为两个模型都是从同一个预训练基础模型训练而来，但偏好微调增添了更多结构、格式编排，当然还有长度——而这些已被反复证明与人们对语言模型的普遍偏好概念相关。想看更多这类范例，请参阅本书附带的补全范例库：https://www.rlhfbook.com/library。
+
+## B.1 话多的平衡（The Chattiness Balance）
+
+无数人正使用 RLHF 或偏好微调方法来冲高 AlpacaEval 与其他自动化聊天排行榜的分数（这类排行榜使用 LLM 即评审（LLM-as-a-judge）来近似衡量一个智能体在简单对话任务上有多么有帮助、无害且诚实），但 RLHF 在这里带来的巨大增益，并没有在较难被操弄的评测（例如 Arena）上带来成比例的分数提升。其中的张力在于：虽然 RLHF 方法确实为这些模型带来可量测的改进，这种训练却不一定能转化为人们真正在意的性能。随着 RLHF 文献体系的建立，大批模型以相关方法发布，宣称用 RLHF 提升了模型的「对齐」程度，但它们往往做得太过火，发表的评测分数从误导人到毫无意义的都有。
+
+这些以对齐为动机的 RLHF 方法，若做得恰当，会让模型更好共事、也更令人愉快。这通常伴随着在 MT Bench 或 AlpacaEval 等评测工具上的明显进步。
+
+2023 年秋天，关于直接偏好优化（Direct Preference Optimization, DPO），以及它相对于近端策略优化（Proximal Policy Optimization, PPO）与其他基于 RL 的偏好微调方法所扮演角色的争论达到高峰——争论的核心正是聊天评测与真实世界性能之间的平衡（关于这些取舍更技术性的讨论，请见第 8 章、Ivison et al. 2024 [125]，或这场演讲）。问题在于，你同样可以把 DPO 与 PPO 这类技术用在反馈循环中、或搭配海量数据使用，结果为了换取这种聊天性能，反而严重损害模型在数学或程序撰写等其他任务上的表现。
+
+在 DPO 对上 PPO 的争论遍地开花期间，出现了许多论文，端出令人难以置信的基准测试成绩，却没有获得任何有意义的采用。即使这些论文发布了模型权重，它们在公开使用上也不受欢迎，因为这些模型在一般使用情境下并不稳健。在 2023 年秋天或其后不久应用 RLHF 时，根本不可能让一个 70 亿参数模型的对齐版本在全面性的基准测试上真正打败 GPT-4（这类比较的结论会持续成立：当时的小模型无法稳健地打败最好的大型前沿模型（frontier model））。这看似显而易见，但总是有论文宣称做出了这类结果。图 48 出自一篇名为直接纳许优化（Direct Nash Optimization, DNO）的论文，该论文主张其模型在 2024 年 4 月的 AlpacaEval 上，在 7B 模型中达到最先进（state-of-the-art）之类的水平 [201]。作为背景说明：DNO 是「奖励模型＋PPO」（经典 RLHF）或一次性（one-shot）DPO 的一种批次式、同策略（on-policy）的*迭代式*替代方案，它把对齐问题定式为寻找相对于一个偏好预言机（preference oracle）的纳许均衡（Nash equilibrium），从而直接优化成对偏好（即胜率差距）。当学术诱因与受到整个社会极度关注的技术交会时，这些挑战便会浮现。
+
+![图](../webapp/assets/figures/fig-p234-1.png)
+*图 48：直接纳许优化（DNO）论文中的结果，突显其小模型胜过了 GPT-4 这一等级的模型。Rosset et al. 2024。授权：CC-BY。*
+
+就连 2024 年 1 月的先驱论文《Self Rewarding Language Models》[297]，也揭露了在 Llama 2 70B 上不切实际的高分。当然，在当时，70B 模型确实能比 7B 模型更接近 GPT-4（如同我们在 2024 年令人印象深刻的 Llama 3 系列发布中所见），但重要的是把模型的实际状况与现代 RLHF 论文中的宣称区分开来。这些模型是针对狭窄的测试集调校出来的，在真实使用中，面对它们宣称击败的那些大得多的模型，表现并不耐打。还有更多类似的方法来来去去，既分享了宝贵的洞见、也夸大了成果，使得 RLHF 更难被理解。
+
+被施加了「怪怪的 RLHF」（"funky RLHF"）的模型，其症状往往是长度偏差（length bias）。这种情况变得太过普遍，以至于 AlpacaEval 与 WildBench 等多个评测系统都内置了线性长度校正机制。这修补了「靠灌话多来『打败 GPT-4』或当时领先的前沿模型」的诱因，并创造出一种较不易被游戏化的动态，让较简短、实用的模型真正有机会胜出。
+
+无论如何，如今在文献中，仅仅为了话多而对聊天模型进行对齐，已经带有些许声誉上的代价（reputational tax），因为大家已承认这些狭隘的方法可能在其他方面损害模型。以下这段来自 2023 年阿里巴巴最初 Qwen 模型的说明，是早期对齐实验中被多次观察到的现象，放大了话多与性能之间的取舍 [407]。
+
+> 我们以大量数据对模型进行了预训练，并以监督式微调（supervised fine-tuning）与直接偏好优化两者对模型进行了后训练。然而，DPO 虽带来人类偏好评估上的进步，却造成了基准评测上的退步。
+
+把这种取舍处理得当的一个早期好例子，是 2024 年 3 月的 Starling Beta 这类模型 [73]。它是从另一个聊天模型 OpenChat [408] 微调而来的模型（后者其实是由完全另一个组织训练的）。它的训练完全聚焦于 k 元比较（k-wise）奖励模型训练与 PPO 优化，并让它在 Arena 上的排名上升了 10 名。该模型的平均回应长度增加了，但增加的方式够好，确实能帮助到人类评分者。较晚的例子如 Olmo 3，文件记载其经历了大量的聊天训练，但作者们偏好选择数学、程序撰写与推理分数较高的最终模型检查点（checkpoint），而不是那些在基于 LLM 即评审的聊天基准上分数最高的候选检查点 [18]。
+
+一个自然的问题是：为什么 RLHF 会让模型的回应变长？根本上，Arena 这类评测已经告诉我们：相较于精简的回应，模型的一般用户往往更喜欢较长、较完整的答案。对于快速评估回应的用户来说，较长的答案可能感觉更周全、更有帮助，甚至更值得信赖。这并不代表*每一位*用户的偏好，但这些模型被训练来贴合众多数据标注者的平均偏好，因此 RLHF 往往会让模型变得更啰嗦。
+
+</script>
+<script src="../assets/marked.min.js"></script>
+<script src="../assets/katex/katex.min.js"></script>
+<script src="../assets/katex/auto-render.min.js"></script>
+<script src="../assets/widgets/appb.js"></script>
+<script src="../assets/app.js"></script>
+<script src="../assets/gh-star.js"></script>
+</body>
+</html>
