@@ -44,7 +44,7 @@
 ## 本地使用
 
 ```bash
-cd webapp && python3 -m http.server 8642   # 浏览 http://localhost:8642
+cd webapp && python3 -m http.server 8642 --bind 0.0.0.0   # 局域网设备通过本机 IP 访问
 ```
 
 修改 `content/*.md` 或添加 `webapp/assets/widgets/*.js` 后重新执行 `python3 build.py`。
